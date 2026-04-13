@@ -1,0 +1,8 @@
+<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Danh mục - Admin</title><link rel="stylesheet" th:href="@{/css/style.css}"></head><body>
+<div th:replace="~{fragments/layout :: adminHeader('admin')}"></div>
+<main class="container page category-page-node">
+  <div th:if="${success}" class="notice" th:text="${success}"></div>
+  <div th:if="${error}" class="notice error" th:text="${error}"></div>
+  <div class="page-header"><div><h1>Danh mục</h1><p>Thêm và sửa danh mục đã tách ra trang riêng.</p></div><a class="btn primary" th:href="@{/admin/categories/new}">Thêm danh mục</a></div>
+  <section class="panel category-list-panel-node"><div class="table-wrap"><table><thead><tr><th>TÊN DANH MỤC</th><th>THAO TÁC</th></tr></thead><tbody><tr th:each="c : ${categories}"><td th:text="${c.name}"></td><td><div class="row"><a class="btn secondary btn-sm" th:href="@{'/admin/categories/' + ${c.id} + '/edit'}">Sửa</a><form th:action="@{'/admin/categories/' + ${c.id} + '/delete'}" method="post"><button class="btn danger btn-sm" type="submit">Xóa</button></form></div></td></tr></tbody></table></div></section>
+</main></body></html>

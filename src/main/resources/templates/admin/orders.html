@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đơn hàng - Admin</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+  <style>
+    .status-select{transition:.2s ease;border-width:2px;font-weight:700;}
+    .status-processing{color:#1d4ed8;border-color:#1d4ed8;background:#dbeafe;}
+    .status-paid{color:#15803d;border-color:#15803d;background:#dcfce7;}
+    .status-shipping{color:#c2410c;border-color:#c2410c;background:#ffedd5;}
+    .status-completed{color:#166534;border-color:#166534;background:#bbf7d0;}
+    .status-cancelled{color:#b91c1c;border-color:#b91c1c;background:#fee2e2;}
+  </style>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: adminHeader('orders')}"></div>
+<main class="container" style="padding:28px 0;">
+  <div th:if="${success}" class="notice" th:text="${success}"></div>
+  <div th:if="${error}" class="notice error" th:text="${error}"></div>
+  <section class="panel">
+    <div class="section-title">
+      <div>
+        <h2 style="margin:0">Đơn hàng khách đặt</h2>
+        <p class="meta" style="margin:8px 0 0;">Xem người đặt hàng, cập nhật trạng thái và xóa đơn đã thanh toán, đã giao.</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+        <tr>
+          <th class="center-cell">Mã</th>
+          <th>Người đặt hàng</th>
+          <th>Sản phẩm</th>
+          <th class="center-cell">Thanh toán</th>
+          <th>Trạng thái thanh toán</th>
+          <th>Giao hàng</th>
+          <th class="center-cell">Tổng tiền</th>
+          <th class="center-cell">Ngày đặt</th>
+          <th class="center-cell">Thao tác</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="o,iter : ${orders}">
+          <td class="center-cell" th:text="${'#' + iter.count}"></td>
+          <td>
+            <strong th:text="${o.customerName}"></strong>
+            <div class="meta" th:text="${o.user != null ? o.user.email : o.customerPhone}"></div>
+            <div class="meta" th:text="${o.customerPhone}"></div>
+          </td>
+          <td>
+            <div th:each="item : ${o.items}"><span th:text="${item.title + ' x ' + item.quantity}"></span></div>
+          </td>
+          <td class="center-cell" th:text="${@orderService.requiresManualTransfer(o.paymentMethod) ? 'MOMO QR' : 'COD'}"></td>
+          <td>
+            <form th:action="@{'/admin/orders/' + ${o.id} + '/payment-status'}" method="post" class="js-status-form">
+              <select name="paymentStatus" class="status-select" data-kind="payment">
+                <option value="pending" th:selected="${o.paymentStatus == 'pending'}">Chưa thanh toán</option>
+                <option value="awaiting_transfer" th:if="${@orderService.requiresManualTransfer(o.paymentMethod)}" th:selected="${o.paymentStatus == 'awaiting_transfer' or o.paymentStatus == 'awaiting'}">Chờ khách quét QR</option>
+                <option value="paid" th:selected="${o.paymentStatus == 'paid'}">Đã thanh toán</option>
+              </select>
+            </form>
+          </td>
+          <td>
+            <form th:action="@{'/admin/orders/' + ${o.id} + '/delivery-status'}" method="post" class="js-status-form">
+              <select name="deliveryStatus" class="status-select" data-kind="delivery">
+                <option value="pending" th:selected="${o.deliveryStatus == 'pending'}">Chưa giao</option>
+                <option value="shipping" th:selected="${o.deliveryStatus == 'shipping'}">Đang giao</option>
+                <option value="delivered" th:selected="${o.deliveryStatus == 'delivered'}">Đã giao</option>
+              </select>
+            </form>
+          </td>
+          <td class="center-cell">
+            <div th:text="${#numbers.formatInteger(o.totalAmount,0,'COMMA')} + 'đ'"></div>
+            <div class="meta" th:text="${#numbers.formatInteger(o.shippingFee != null ? o.shippingFee : 0,0,'COMMA')} + 'đ ship'"></div>
+          </td>
+          <td class="center-cell" th:text="${#temporals.format(o.createdAt,'HH:mm:ss dd/M/yyyy')}"></td>
+          <td class="center-cell"><a class="btn danger btn-sm" th:href="@{'/admin/orders/' + ${o.id} + '/delete'}">Xóa</a></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script th:src="@{/js/common.js}"></script>
+<script>
+</script>
+<script>
+function statusClassForSelect(select){
+  const value=(select.value||'').toLowerCase();
+  const classes=['status-processing','status-paid','status-shipping','status-completed','status-cancelled'];
+  select.classList.remove(...classes);
+  if (value==='paid') select.classList.add('status-paid');
+  else if (value==='shipping') select.classList.add('status-shipping');
+  else if (value==='delivered') select.classList.add('status-completed');
+  else if (value==='deleted') select.classList.add('status-cancelled');
+  else select.classList.add('status-processing');
+}
+document.querySelectorAll('.status-select').forEach((select)=>{statusClassForSelect(select); select.addEventListener('change', async ()=>{const form=select.closest('form'); const fd=new FormData(form); try{await fetch(form.action,{method:'POST', body:new URLSearchParams(fd), headers:{'X-Requested-With':'XMLHttpRequest'}}); statusClassForSelect(select);}catch(e){alert('Cập nhật thất bại');}});});
+</script>
+</body>
+</html>

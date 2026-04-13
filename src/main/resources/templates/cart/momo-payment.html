@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KINGSPORT - Thanh toán QR MoMo</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+  <style>
+    .payment-hero{display:grid;grid-template-columns:1.1fr .95fr;gap:18px}
+    .payment-card{border:1px solid var(--border);border-radius:24px;background:#fff;padding:22px}
+    .momo-info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:16px}
+    .momo-info-item{border:1px solid #f5c2e7;border-radius:18px;background:#fdf2f8;padding:14px}
+    .momo-info-item strong{display:block;font-size:20px;line-height:1.45;word-break:break-word}
+    .momo-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+    .qr-box{background:#fff;border:1px solid #f5c2e7;border-radius:28px;padding:16px;text-align:center}
+    .qr-box img{max-width:100%;border-radius:22px;display:block;margin:0 auto}
+    @media (max-width: 980px){.payment-hero{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: siteHeader('orders','')}"></div>
+<main class="container page">
+  <div class="page-header">
+    <div>
+      <h1>Thanh toán bằng QR MoMo</h1>
+      <div class="meta">Đơn hàng của bạn</div>
+    </div>
+    <a class="btn secondary" th:href="@{/orders}">← Quay lại đơn hàng</a>
+  </div>
+
+  <div th:if="${success}" class="notice" th:text="${success}"></div>
+  <div th:if="${error}" class="notice error" th:text="${error}"></div>
+
+  <section class="payment-hero">
+    <article class="payment-card">
+      <h3 style="margin-top:0;">Quét mã để thanh toán</h3>
+      <div class="meta">Trạng thái hiện tại: <strong th:text="${paymentStatusLabel}"></strong></div>
+      <div class="momo-info-grid">
+        <div class="momo-info-item">
+          <div class="meta">Phương thức</div>
+          <strong>QR MoMo</strong>
+        </div>
+        <div class="momo-info-item">
+          <div class="meta">Số tiền cần thanh toán</div>
+          <strong th:text="${#numbers.formatInteger(order.totalAmount,0,'COMMA')} + 'đ'">0đ</strong>
+        </div>
+        <div class="momo-info-item" style="grid-column:1 / -1;">
+          <div class="meta">Nội dung chuyển khoản</div>
+          <strong th:text="${transferContent}">DH1_1234</strong>
+        </div>
+      </div>
+      <div class="momo-actions">
+        <button type="button" class="btn secondary js-copy-value" th:attr="data-copy=${transferContent}">Sao chép nội dung</button>
+        <button type="button" class="btn secondary js-copy-value" th:attr="data-copy=${order.totalAmount}">Sao chép số tiền</button>
+      </div>
+      <div class="meta" style="margin-top:16px;line-height:1.8;">Nếu bạn chưa thanh toán thì cứ để nguyên trang này. Sau khi quét QR và chuyển xong, bấm nút <strong>Tôi đã thanh toán</strong> để quay về danh sách đơn hàng. Shop sẽ xác nhận thanh toán cho đơn của bạn sau.</div>
+      <form th:action="@{'/orders/' + ${order.id} + '/momo-payment/confirmed'}" method="post" style="margin-top:18px;">
+        <button class="btn primary" type="submit">Tôi đã thanh toán</button>
+      </form>
+    </article>
+
+    <aside class="payment-card">
+      <div class="qr-box">
+        <img th:src="@{${momoQrImageUrl}}" alt="Mã QR MoMo">
+      </div>
+      <div style="margin-top:18px;">
+        <div class="row between" style="margin-bottom:10px;"><span>Tạm tính</span><strong th:text="${#numbers.formatInteger(order.originalAmount,0,'COMMA')} + 'đ'"></strong></div>
+        <div class="row between" style="margin-bottom:10px;"><span>Phí ship</span><strong th:text="${#numbers.formatInteger(order.shippingFee != null ? order.shippingFee : 0,0,'COMMA')} + 'đ'"></strong></div>
+        <div class="row between" style="margin-bottom:10px;"><span>Khoảng cách</span><strong th:text="${#numbers.formatDecimal(order.shippingDistanceKm != null ? order.shippingDistanceKm : 0,1,2)} + ' km'"></strong></div>
+        <div class="row between" style="margin-bottom:10px;"><span>Giảm giá</span><strong th:text="${#numbers.formatInteger(order.discountAmount,0,'COMMA')} + 'đ'"></strong></div>
+        <div class="row between" style="padding-top:14px;border-top:1px solid var(--border);"><span>Tổng thanh toán</span><strong th:text="${#numbers.formatInteger(order.totalAmount,0,'COMMA')} + 'đ'"></strong></div>
+      </div>
+    </aside>
+  </section>
+</main>
+<script>
+document.addEventListener('click', async (event) => {
+  const btn = event.target.closest('.js-copy-value');
+  if (!btn) return;
+  const value = btn.getAttribute('data-copy') || '';
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    const original = btn.textContent;
+    btn.textContent = 'Đã sao chép';
+    setTimeout(() => { btn.textContent = original; }, 1200);
+  } catch (e) {
+    alert('Không thể sao chép tự động. Giá trị: ' + value);
+  }
+});
+</script>
+</body>
+</html>

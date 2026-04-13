@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KINGSPORT - Thanh toán</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <style>
+    .map-search-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+    .map-box{height:360px;border:1px solid var(--border);border-radius:18px;overflow:hidden;margin-top:12px;background:#f8fafc;position:relative}
+    .map-status{margin-top:8px;color:#64748b;font-size:14px}
+    .map-meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px}
+    .map-meta-card{border:1px solid var(--border);border-radius:16px;padding:12px;background:#fff}
+    .search-results{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+    .search-result-item{border:1px solid var(--border);border-radius:14px;padding:10px 12px;background:#fff;cursor:pointer;text-align:left}
+    .search-result-item:hover{border-color:#2563eb;background:#eff6ff}
+    .payment-box{margin-top:16px;border:1px solid #f5c2e7;background:#fdf2f8;color:#831843;border-radius:18px;padding:18px}
+    .payment-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .payment-head h4{margin:0}
+    .payment-grid{display:grid;grid-template-columns:1fr .95fr;gap:14px;align-items:start}
+    .payment-field{border:1px solid rgba(236,72,153,.18);background:#fff;border-radius:16px;padding:12px}
+    .payment-field strong{display:block;font-size:18px;line-height:1.4;word-break:break-word}
+    .payment-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+    .payment-note{margin-top:12px;color:#6b214c;font-size:14px;line-height:1.7}
+    .payment-amount-preview{margin-top:12px;padding:12px 14px;border-radius:16px;background:#fce7f3;color:#9d174d;font-weight:700}
+    .payment-qr-preview{background:#fff;border:1px solid rgba(236,72,153,.18);border-radius:22px;padding:14px;text-align:center}
+    .payment-qr-preview img{max-width:100%;border-radius:18px;display:block;margin:0 auto}
+    .payment-qr-preview .meta{margin-top:10px}
+    @media (max-width: 980px){.payment-grid{grid-template-columns:1fr}}
+    .my-coupon-list{display:flex;flex-wrap:wrap;gap:10px}
+  .my-coupon-list .detail-choice{display:inline-flex;flex:0 0 auto;width:auto;min-width:unset;padding:10px 16px}
+  .my-coupon-list .detail-choice.active{border-color:#1d4ed8;background:#dbeafe;color:#1d4ed8}
+</style>
+</head>
+<body>
+<div th:replace="~{fragments/layout :: siteHeader('checkout','')}"></div>
+<main class="container page">
+  <div class="page-header">
+    <div><h1>Thanh toán</h1></div>
+    <a class="btn secondary" th:href="@{/cart}">← Quay lại giỏ hàng</a>
+  </div>
+  <section class="cart-layout">
+    <div class="panel">
+      <form th:action="@{/checkout}" method="post">
+        <div class="form-grid">
+          <div>
+            <label for="checkoutFullName">Họ tên người nhận</label>
+            <input id="checkoutFullName" name="customerName" type="text" placeholder="Nhập họ tên" th:value="${savedAddress != null ? savedAddress.fullName : currentUser}" required>
+          </div>
+          <div>
+            <label for="checkoutPhone">Số điện thoại</label>
+            <input id="checkoutPhone" name="customerPhone" type="text" placeholder="Nhập số điện thoại" th:value="${savedAddress != null ? savedAddress.phone : ''}" required>
+          </div>
+          <div class="full">
+            <label for="checkoutAddress">Địa chỉ nhận hàng</label>
+            <textarea id="checkoutAddress" name="customerAddress" placeholder="Nhập địa chỉ giao hàng" required th:text="${savedAddress != null ? savedAddress.address : ''}"></textarea>
+          </div>
+          <div class="full">
+            <label for="addressSearch">Tìm địa chỉ trên bản đồ</label>
+            <div class="map-search-row">
+              <input id="addressSearch" type="text" placeholder="Ví dụ: 72 Lê Thánh Tôn, Quận 1, TP.HCM">
+              <button class="btn secondary" type="button" id="searchAddressBtn">Tìm địa chỉ</button>
+            </div>
+            <div id="searchResults" class="search-results"></div>
+            <div id="leafletMap" class="map-box" th:attr="data-store-lat=${storeLat},data-store-lon=${storeLon}"></div>
+            <div id="mapStatus" class="map-status">Đang tải bản đồ...</div>
+            <div class="map-meta-grid">
+              <div class="map-meta-card"><div class="meta">Địa chỉ đã chọn</div><strong id="selectedAddressLabel">Chưa chọn địa chỉ</strong></div>
+              <div class="map-meta-card"><div class="meta">Quãng đường thực tế</div><strong id="shippingDistanceLabel">0 km</strong></div>
+              <div class="map-meta-card"><div class="meta">Phí ship</div><strong id="shippingFeeLabel">0đ</strong></div>
+            </div>
+            <div class="meta" style="margin-top:8px;">Phí ship tính theo quãng đường thực tế: <strong th:text="${#numbers.formatInteger(shippingPricePerKm,0,'COMMA')} + 'đ/km'"></strong>.</div>
+          </div>
+          <div class="full" th:if="${isLoggedIn}">
+            <label>Điểm tích lũy của bạn</label>
+            <div class="loyalty-inline-box">Bạn có thể dùng điểm ở mục Đổi quà để lấy mã giảm giá cá nhân.</div>
+          </div>
+          <div class="full">
+            <label for="couponCode">Mã giảm giá</label>
+            <div class="coupon-row">
+              <input id="couponCode" type="text" placeholder="Nhập mã giảm giá, ví dụ: GIAM50K"><input id="appliedCouponCode" name="couponCode" type="hidden" th:value="${couponCode}">
+              <button class="btn secondary" type="button" id="applyCouponBtn">Áp dụng</button>
+            </div>
+            <div class="meta" style="margin-top:8px;" id="couponMessage" th:text="${couponMessage}"></div>
+          </div>
+          <div class="full" th:if="${myCoupons != null and !#lists.isEmpty(myCoupons)}">
+            <label>Mã cá nhân của bạn</label>
+            <div class="my-coupon-list">
+              <button type="button" class="choice-chip detail-choice" th:each="cp : ${myCoupons}" th:attr="data-code=${cp.code}"><span th:text="${cp.code}"></span></button>
+            </div>
+          </div>
+          <div class="full">
+            <label>Phương thức thanh toán</label>
+            <div class="row payment-methods" id="paymentMethods">
+              <label class="choice-chip payment-choice active"><input type="radio" name="paymentMethod" value="cod" checked><span>Thanh toán khi nhận hàng</span></label>
+              <label class="choice-chip payment-choice"><input type="radio" name="paymentMethod" value="momo"><span>Quét mã QR MoMo</span></label>
+            </div>
+            <div id="momoPaymentBox" class="payment-box hidden">
+              <div class="payment-head">
+                <h4>Thanh toán bằng mã QR MoMo</h4>
+                <span class="badge">Chờ bạn quét mã</span>
+              </div>
+              <div class="payment-grid">
+                <div>
+                  <div class="payment-field">
+                    <div class="meta">Hướng dẫn</div>
+                    <strong>Mở app MoMo hoặc ứng dụng ngân hàng hỗ trợ QR để quét mã của shop.</strong>
+                  </div>
+                  <div class="payment-amount-preview">Số tiền cần thanh toán: <span id="momoTransferAmountLabel" th:text="${#numbers.formatInteger(total,0,'COMMA')} + 'đ'">0đ</span></div>
+                  <div class="payment-note">Sau khi bấm tạo đơn, hệ thống sẽ mở trang chờ thanh toán QR. Nếu bạn chưa quét mã thì trang đó sẽ đứng yên tại chỗ. Sau khi bạn thanh toán xong, bấm nút <strong>Tôi đã thanh toán</strong> để quay về đơn hàng và chờ shop xác nhận.</div>
+                </div>
+                <div class="payment-qr-preview">
+                  <img th:src="@{${momoQrImageUrl}}" alt="Mã QR MoMo">
+                  <div class="meta">Dùng đúng số tiền hiển thị trong đơn để shop đối soát nhanh hơn.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="full">
+            <label for="note">Ghi chú đơn hàng</label>
+            <textarea id="note" name="note" placeholder="Ghi chú thêm nếu cần"></textarea>
+            <input type="hidden" id="customerLat" name="customerLat">
+            <input type="hidden" id="customerLon" name="customerLon">
+          </div>
+        </div>
+        <div class="row" style="margin-top:18px;"><button id="checkoutBtn" class="btn primary" type="submit">Đặt hàng</button></div>
+      </form>
+    </div>
+    <div class="panel summary-card">
+      <h3 style="margin-top:0">Đơn hàng của bạn</h3>
+      <div th:each="item : ${items}" class="row between" style="gap:12px; margin-bottom:10px;"><span th:text="${(item.product != null ? item.product.name : 'Sản phẩm') + ' x' + item.quantity}"></span><strong th:text="${#numbers.formatInteger(item.subtotal,0,'COMMA')} + 'đ'"></strong></div>
+      <div class="row between" style="margin-top:18px;"><span>Tạm tính</span><strong id="checkoutSubtotal" th:text="${#numbers.formatInteger(subtotal,0,'COMMA')} + 'đ'"></strong></div>
+      <div class="row between" style="margin-top:10px;"><span>Giảm giá</span><strong id="checkoutDiscount" th:text="${#numbers.formatInteger(discount,0,'COMMA')} + 'đ'"></strong></div>
+      <div class="row between" style="margin-top:10px;"><span>Phí ship</span><strong id="checkoutShipping">0đ</strong></div>
+      <div class="row between" style="margin-top:10px;"><span>Khoảng cách</span><strong id="checkoutDistance">0 km</strong></div>
+      <div class="row between" style="margin-top:18px; padding-top:18px; border-top:1px solid var(--border);"><span>Tổng thanh toán</span><strong id="checkoutTotal" th:text="${#numbers.formatInteger(total,0,'COMMA')} + 'đ'"></strong></div>
+      <div class="meta" style="margin-top:10px;">Bạn có thể đổi điểm ở mục <strong>Đơn hàng</strong> để lấy mã giảm giá cá nhân.</div>
+    </div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const formatMoney = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+  const formatDistance = (value) => `${Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} km`;
+  const mapEl = document.getElementById('leafletMap');
+  const storeLat = Number(mapEl?.dataset.storeLat || 10.776889);
+  const storeLon = Number(mapEl?.dataset.storeLon || 106.700806);
+  const addressInput = document.getElementById('checkoutAddress');
+  const searchInput = document.getElementById('addressSearch');
+  const resultsBox = document.getElementById('searchResults');
+  const latInput = document.getElementById('customerLat');
+  const lonInput = document.getElementById('customerLon');
+  const couponInput = document.getElementById('couponCode');
+  const appliedCouponInput = document.getElementById('appliedCouponCode');
+  const mapStatus = document.getElementById('mapStatus');
+  const checkoutBtn = document.getElementById('checkoutBtn');
+  const momoPaymentBox = document.getElementById('momoPaymentBox');
+  const momoTransferAmountLabel = document.getElementById('momoTransferAmountLabel');
+
+  function syncPaymentState() {
+    const selected = document.querySelector('.payment-choice input:checked');
+    document.querySelectorAll('.payment-choice').forEach((item) => item.classList.remove('active'));
+    selected?.closest('.payment-choice')?.classList.add('active');
+    if (momoPaymentBox) momoPaymentBox.classList.toggle('hidden', selected?.value !== 'momo');
+    if (checkoutBtn) checkoutBtn.textContent = selected?.value === 'momo' ? 'Tạo đơn thanh toán QR' : 'Đặt hàng';
+  }
+
+  document.querySelectorAll('.payment-choice input').forEach((input) => input.addEventListener('change', syncPaymentState));
+  document.querySelectorAll('[data-code]').forEach((btn) => btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-code]').forEach((item) => item.classList.remove('active'));
+    btn.classList.add('active');
+    if (couponInput) couponInput.value = btn.getAttribute('data-code') || '';
+  }));
+
+  let map = null;
+  let customerMarker = null;
+  let distanceLine = null;
+
+  function ensureMap() {
+    if (!window.L || !mapEl) {
+      if (mapStatus) mapStatus.textContent = 'Không tải được thư viện bản đồ Leaflet. Vui lòng tải lại trang.';
+      return;
+    }
+    if (map) return;
+    map = L.map('leafletMap', { preferCanvas: true }).setView([storeLat, storeLon], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    L.marker([storeLat, storeLon]).addTo(map).bindPopup('Cửa hàng');
+    if (mapStatus) mapStatus.textContent = 'Bản đồ đã sẵn sàng. Bạn có thể tìm địa chỉ và chọn điểm giao hàng.';
+    setTimeout(() => map.invalidateSize(), 250);
+    window.addEventListener('resize', () => map && map.invalidateSize());
+  }
+
+  function updateShippingUI(distanceKm, shippingFee, displayName, lat, lon) {
+    document.getElementById('shippingDistanceLabel').textContent = formatDistance(distanceKm);
+    document.getElementById('shippingFeeLabel').textContent = formatMoney(shippingFee);
+    document.getElementById('checkoutShipping').textContent = formatMoney(shippingFee);
+    document.getElementById('checkoutDistance').textContent = formatDistance(distanceKm);
+    if (displayName) {
+      document.getElementById('selectedAddressLabel').textContent = displayName;
+      if (addressInput) addressInput.value = displayName;
+      if (searchInput) searchInput.value = displayName;
+    }
+    if (lat == null || lon == null) return;
+    if (latInput) latInput.value = lat;
+    if (lonInput) lonInput.value = lon;
+    ensureMap();
+    if (!map) return;
+    if (customerMarker) map.removeLayer(customerMarker);
+    if (distanceLine) map.removeLayer(distanceLine);
+    const storePoint = L.latLng(storeLat, storeLon);
+    const customerPoint = L.latLng(lat, lon);
+    customerMarker = L.marker(customerPoint).addTo(map).bindPopup('Địa chỉ giao hàng');
+    distanceLine = L.polyline([storePoint, customerPoint], { dashArray: '8 8' }).addTo(map);
+    map.fitBounds(L.latLngBounds(storePoint, customerPoint), { padding: [30, 30] });
+  }
+
+  async function refreshCheckoutTotal(commitCoupon = false) {
+    const typedCoupon = (couponInput?.value || '').trim();
+    const appliedCoupon = (appliedCouponInput?.value || '').trim();
+    const couponCode = typedCoupon || appliedCoupon;
+    const msg = document.getElementById('couponMessage');
+    const params = new URLSearchParams();
+    if (couponCode) params.set('couponCode', couponCode);
+    if (latInput?.value) params.set('customerLat', latInput.value);
+    if (lonInput?.value) params.set('customerLon', lonInput.value);
+    const res = await fetch(`/checkout/coupon-preview?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const data = await res.json();
+    document.getElementById('checkoutSubtotal').textContent = formatMoney(data.subtotal);
+    document.getElementById('checkoutDiscount').textContent = formatMoney(data.discount);
+    document.getElementById('checkoutShipping').textContent = formatMoney(data.shippingFee || 0);
+    document.getElementById('checkoutDistance').textContent = formatDistance(data.shippingDistanceKm || 0);
+    document.getElementById('checkoutTotal').textContent = formatMoney(data.total);
+    document.getElementById('shippingFeeLabel').textContent = formatMoney(data.shippingFee || 0);
+    document.getElementById('shippingDistanceLabel').textContent = formatDistance(data.shippingDistanceKm || 0);
+    if (momoTransferAmountLabel) momoTransferAmountLabel.textContent = formatMoney(data.total || 0);
+    if (msg) msg.textContent = data.couponMessage || '';
+    if (commitCoupon) {
+      if (data.ok && couponCode) {
+        if (appliedCouponInput) appliedCouponInput.value = couponCode;
+        if (couponInput) couponInput.value = '';
+      } else if (!couponCode) {
+        if (appliedCouponInput) appliedCouponInput.value = '';
+      }
+    }
+    return data;
+  }
+
+  async function chooseAddress(lat, lon, displayName) {
+    updateShippingUI(0, 0, displayName, lat, lon);
+    await refreshCheckoutTotal();
+  }
+
+  async function searchAddress() {
+    const keyword = (searchInput?.value || '').trim();
+    if (!keyword || !resultsBox) return;
+    resultsBox.innerHTML = '<div class="meta">Đang tìm địa chỉ...</div>';
+    try {
+      const res = await fetch(`/checkout/address-search?q=${encodeURIComponent(keyword)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) {
+        resultsBox.innerHTML = '<div class="meta">Không tìm thấy địa chỉ phù hợp.</div>';
+        return;
+      }
+      resultsBox.innerHTML = data.map((item) => {
+        const name = String(item.display_name || '').replace(/"/g, '&quot;');
+        return `<button type="button" class="search-result-item" data-lat="${item.lat}" data-lon="${item.lon}" data-name="${name}">${item.display_name || ''}</button>`;
+      }).join('');
+      resultsBox.querySelectorAll('.search-result-item').forEach((btn) => btn.addEventListener('click', async () => {
+        const lat = Number(btn.getAttribute('data-lat'));
+        const lon = Number(btn.getAttribute('data-lon'));
+        const displayName = btn.getAttribute('data-name') || '';
+        await chooseAddress(lat, lon, displayName);
+      }));
+    } catch (e) {
+      resultsBox.innerHTML = '<div class="meta">Không thể tìm địa chỉ lúc này.</div>';
+    }
+  }
+
+  ensureMap();
+  syncPaymentState();
+  refreshCheckoutTotal();
+  document.getElementById('applyCouponBtn')?.addEventListener('click', () => refreshCheckoutTotal(true));
+  document.getElementById('searchAddressBtn')?.addEventListener('click', searchAddress);
+  searchInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      searchAddress();
+    }
+  });
+});
+</script>
+<script th:src="@{/js/common.js}"></script>
+</body>
+</html>
