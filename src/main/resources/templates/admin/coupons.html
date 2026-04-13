@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Mã giảm giá - Sport Store</title><link rel="stylesheet" th:href="@{/css/style.css}"></head>
+<body>
+<div th:replace="~{fragments/layout :: adminHeader('coupons')}"></div>
+<main class="container" style="padding:28px 0;">
+  <section class="panel">
+    <div class="section-title list-toolbar"><div><h2 style="margin:0">Mã giảm giá</h2><p class="meta" style="margin:8px 0 0;">Quản lý mã giảm giá thanh toán riêng, tách biệt với mã đổi điểm.</p></div><div class="list-toolbar-actions"><a class="btn secondary" th:href="@{/admin}">Quay lại</a></div></div>
+    <div class="table-wrap" style="margin-top:16px;"><table><thead><tr><th>Mã</th><th>Tên hiển thị</th><th>Loại</th><th>Giá trị</th><th>Đơn tối thiểu</th><th>Giảm tối đa</th><th>Trạng thái</th></tr></thead><tbody><tr th:each="cp : ${coupons}"><td th:text="${cp.code}"></td><td th:text="${cp.title}"></td><td th:text="${cp.couponType}"></td><td th:text="${cp.couponType == 'percent' ? cp.couponValue + '%' : #numbers.formatInteger(cp.couponValue,0,'COMMA') + 'đ'}"></td><td th:text="${#numbers.formatInteger(cp.minOrderAmount,0,'COMMA')} + 'đ'"></td><td th:text="${#numbers.formatInteger(cp.maxDiscount,0,'COMMA')} + 'đ'"></td><td th:text="${cp.active ? 'Hoạt động' : 'Tạm khóa'}"></td></tr></tbody></table></div>
+  </section>
+</main>
+</body>
+</html>

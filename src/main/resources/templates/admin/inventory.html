@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Quản lý kho</title><link rel="stylesheet" th:href="@{/css/style.css}"></head><body>
+<div th:replace="~{fragments/layout :: adminHeader('inventory')}"></div>
+<main class="container page" id="inventoryPageRoot">
+  <div id="inventoryFlashWrap">
+    <div th:if="${success}" class="notice" th:text="${success}"></div>
+    <div th:if="${error}" class="notice error" th:text="${error}"></div>
+  </div>
+  <section class="panel inventory-admin-hero inventory-admin-hero-node" id="inventoryPanelWrap">
+    <div class="page-header inventory-page-header-node" style="display:block;">
+      <h1>Quản lý kho</h1>
+      <p>Nhập kho, xuất kho và theo dõi tồn hiện tại.</p>
+    </div>
+    <div class="table-wrap inventory-table-wrap inventory-table-wrap-node">
+      <table>
+        <thead><tr><th>SẢN PHẨM</th><th>DANH MỤC</th><th class="center-cell">TỒN KHO</th><th class="center-cell">ĐÃ BÁN</th><th class="center-cell">TỒN THEO SIZE</th></tr></thead>
+        <tbody>
+          <tr th:each="row : ${rows}">
+            <td class="inventory-product-cell"><strong th:text="${row.productName}"></strong></td>
+            <td th:text="${row.categoryName}"></td>
+            <td class="center-cell"><strong th:text="${row.stock}"></strong></td>
+            <td class="center-cell" th:text="${row.soldCount}"></td>
+            <td class="center-cell inventory-size-cell-node inventory-size-col-fixed">
+              <div class="inventory-size-list inventory-size-list-node" th:if="${!#lists.isEmpty(row.sizes)}">
+                <div class="inventory-size-item inventory-size-item-node" th:each="s : ${row.sizes}">
+                  <form method="post" class="inventory-form-inline inventory-form-inline-node js-inventory-form">
+                    <div class="inventory-size-stock-label-wrap"><span class="inventory-size-stock-label"><span class="inventory-size-name" th:text="${s.sizeLabel}"></span><span class="inventory-size-sep">:</span><span class="inventory-size-stock" th:text="${s.stock}"></span></span></div>
+                    <input class="inventory-qty-input" type="number" name="quantity" min="1" value="1">
+                    <button type="submit" class="btn success btn-sm inventory-mini-btn" data-action="in" th:attr="data-url=@{'/admin/inventory/' + ${row.productId} + '/' + ${s.sizeLabel} + '/in'}">Nhập</button>
+                    <button type="submit" class="btn secondary btn-sm inventory-mini-btn" data-action="out" th:attr="data-url=@{'/admin/inventory/' + ${row.productId} + '/' + ${s.sizeLabel} + '/out'}">Xuất</button>
+                  </form>
+                </div>
+              </div>
+              <span th:if="${#lists.isEmpty(row.sizes)}">-</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel inventory-history-panel inventory-history-panel-node" id="inventoryHistoryWrap">
+    <div class="page-header small-gap" style="display:block;"><h2>Lịch sử nhập xuất</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>THỜI GIAN</th><th>SẢN PHẨM</th><th>SIZE</th><th>LOẠI</th><th>SỐ LƯỢNG</th><th>TỒN TRƯỚC</th><th>TỒN SAU</th></tr></thead>
+        <tbody>
+          <tr th:each="h : ${historyRows}"><td th:text="${#temporals.format(h.createdAt, 'HH:mm:ss d/M/yyyy')}"></td><td th:text="${h.productName}"></td><td th:text="${h.sizeLabel}"></td><td th:text="${h.type}"></td><td th:text="${h.quantity}"></td><td th:text="${h.stockBefore}"></td><td th:text="${h.stockAfter}"></td></tr>
+          <tr th:if="${#lists.isEmpty(historyRows)}"><td colspan="7" class="meta">Chưa có lịch sử nhập xuất.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+(() => {
+  const root = document.getElementById('inventoryPageRoot');
+  if (!root) return;
+  const flashWrap = document.getElementById('inventoryFlashWrap');
+  const qtyDrafts = {};
+
+  function syncFormKeys() {
+    root.querySelectorAll('.inventory-size-item-node').forEach((row, idx) => {
+      const form = row.querySelector('.js-inventory-form');
+      const label = row.querySelector('.inventory-size-stock-label')?.textContent?.trim() || String(idx);
+      if (form) form.dataset.formKey = `${label}-${idx}`;
+    });
+  }
+
+  function captureDrafts() {
+    root.querySelectorAll('.js-inventory-form').forEach((form, idx) => {
+      const key = form.dataset.formKey || String(idx);
+      const input = form.querySelector('input[name="quantity"]');
+      if (input) qtyDrafts[key] = input.value || '1';
+    });
+  }
+
+  function restoreDrafts(resetKey) {
+    root.querySelectorAll('.js-inventory-form').forEach((form, idx) => {
+      const key = form.dataset.formKey || String(idx);
+      const input = form.querySelector('input[name="quantity"]');
+      if (!input) return;
+      input.value = key === resetKey ? '1' : (qtyDrafts[key] || input.value || '1');
+      input.addEventListener('input', () => { qtyDrafts[key] = input.value || '1'; });
+    });
+  }
+
+  async function refreshInventoryPartial(message, isError, resetKey) {
+    const html = await fetch(window.location.href, { headers: { 'X-Requested-With': 'fetch' } }).then(r => r.text());
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const nextPanel = doc.getElementById('inventoryPanelWrap');
+    const nextHistory = doc.getElementById('inventoryHistoryWrap');
+    if (nextPanel) document.getElementById('inventoryPanelWrap').innerHTML = nextPanel.innerHTML;
+    if (nextHistory) document.getElementById('inventoryHistoryWrap').innerHTML = nextHistory.innerHTML;
+    bindForms();
+    restoreDrafts(resetKey);
+    if (flashWrap) flashWrap.innerHTML = message ? `<div class="notice ${isError ? 'error' : ''}">${message}</div>` : '';
+  }
+
+  async function submitInventoryForm(form, actionUrl, successMessage) {
+    const fd = new FormData(form);
+    const resetKey = form.dataset.formKey || '';
+    captureDrafts();
+    try {
+      const res = await fetch(actionUrl, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' } });
+      let message = successMessage || 'Đã cập nhật kho';
+      let isError = !res.ok;
+      if (!res.ok) {
+        try { message = await res.text() || 'Cập nhật kho thất bại'; } catch (e) {}
+      }
+      await refreshInventoryPartial(message, isError, isError ? '' : resetKey);
+    } catch (e) {
+      await refreshInventoryPartial('Cập nhật kho thất bại', true, '');
+    }
+  }
+
+  function bindForms() {
+    syncFormKeys();
+    root.querySelectorAll('.js-inventory-form').forEach(form => {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const submitter = e.submitter;
+        const actionUrl = submitter?.dataset?.url;
+        const successMessage = submitter?.dataset?.action === 'out' ? 'Đã xuất kho' : 'Đã nhập kho';
+        if (!actionUrl) return;
+        submitInventoryForm(form, actionUrl, successMessage);
+      }, { once: true });
+    });
+  }
+
+  bindForms();
+  restoreDrafts('');
+})();</script>
+
+<script th:src="@{/js/common.js}"></script>
+<script>
+(() => { enableLiveRefresh({ selector: 'main.container.page', onlyPaths: ['/admin/inventory'], interval: 4000 }); })();
+</script>
+
+<script th:src="@{/js/common.js}"></script>
+<script>
+(() => { enableLiveRefresh({ selector: 'main.container.page', onlyPaths: ['/admin/inventory'], interval: 4000 }); })();
+</script>
+</body></html></html>

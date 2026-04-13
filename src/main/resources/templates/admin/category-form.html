@@ -1,0 +1,8 @@
+<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title th:text="${pageTitle}">Danh mục</title><link rel="stylesheet" th:href="@{/css/style.css}"></head><body>
+<div th:replace="~{fragments/layout :: adminHeader('admin')}"></div>
+<main class="container page category-page-node">
+  <div th:if="${success}" class="notice" th:text="${success}"></div>
+  <div th:if="${error}" class="notice error" th:text="${error}"></div>
+  <div class="page-header"><div><h1 th:text="${pageTitle}"></h1><p th:text="${pageSubtitle}"></p></div><a class="btn secondary" th:href="@{/admin}">Quay lại quản trị</a></div>
+  <section class="panel category-form-shell-node"><div class="panel category-form-panel category-form-panel-node"><form th:action="@{/admin/categories/save}" method="post"><input type="hidden" name="id" th:value="${category.id}"><div class="form-grid"><div><label>Tên danh mục</label><input name="name" th:value="${category.name}" required></div></div><div class="row category-form-actions-node"><button class="btn primary" type="submit" th:text="${category.id == null ? 'Lưu danh mục' : 'Cập nhật danh mục'}"></button><a class="btn secondary" th:href="@{/admin}">Hủy</a></div></form></div></section>
+</main></body></html>

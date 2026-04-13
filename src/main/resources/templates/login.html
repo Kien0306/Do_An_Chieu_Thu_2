@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>KINGSPORT - Đăng nhập</title><link rel="stylesheet" th:href="@{/css/style.css}"></head>
+<body class="auth-page-body">
+<main class="auth-shell">
+  <section class="auth-showcase auth-showcase-login">
+    <div><div class="auth-brand"><span class="auth-brand-badge">K</span><span>KINGSPORT</span></div><div class="auth-copy"><span class="auth-eyebrow">Trải nghiệm mua sắm hiện đại</span><h1 class="auth-title">Chào mừng bạn<br>quay lại.</h1><p class="auth-description">Đăng nhập để theo dõi đơn hàng, tích điểm thành viên, lưu giỏ hàng và nhận ưu đãi cá nhân hóa như các nền tảng thương mại điện tử lớn.</p></div></div>
+    <div><div class="auth-highlights"><div class="auth-highlight"><strong>24/7</strong><span>Hỗ trợ khách hàng liên tục</span></div><div class="auth-highlight"><strong>100%</strong><span>Đồng bộ tài khoản và đơn hàng</span></div><div class="auth-highlight"><strong>Nhanh</strong><span>Đăng nhập và mua sắm mượt mà</span></div></div></div>
+  </section>
+  <section class="auth-panel-wrap">
+    <div class="auth-panel auth-panel--spacious">
+      <div class="auth-panel-header"><span class="auth-panel-label">Đăng nhập tài khoản</span><h2>Tiếp tục với tài khoản của bạn</h2><p>Quản lý đơn hàng, điểm thưởng và thông tin cá nhân trong một nơi duy nhất.</p></div>
+      <div th:if="${param.error}" class="notice error">Sai tài khoản hoặc mật khẩu.</div>
+      <div th:if="${success}" class="notice" th:text="${success}"></div>
+      <form th:action="@{/login}" method="post" class="auth-form">
+        <div class="auth-field"><label>Tên đăng nhập</label><div class="auth-input-wrap"><span class="auth-input-icon">✉</span><input name="username" class="auth-input" placeholder="Nhập tên đăng nhập" required></div></div>
+        <div class="auth-field"><label>Mật khẩu</label><div class="auth-input-wrap"><span class="auth-input-icon">🔒</span><input id="loginPassword" type="password" name="password" class="auth-input" placeholder="Nhập mật khẩu" required><button class="auth-password-toggle" type="button" onclick="togglePassword('loginPassword', this)">👁</button></div></div>
+        <div class="auth-meta auth-meta--row">
+          <label class="auth-check auth-check--compact"><input type="checkbox" checked><span>Giữ đăng nhập</span></label>
+          <a class="auth-link" th:href="@{/forgot-password}">Quên mật khẩu?</a>
+        </div>
+        <button class="auth-submit" type="submit">Đăng nhập ngay</button>
+        <div class="auth-divider"><span>Hoặc</span></div>
+        <div class="auth-actions-grid">
+          <a class="auth-secondary-btn" th:href="@{/register}">Tạo tài khoản mới</a>
+          <a class="auth-secondary-btn" th:href="@{/}">Về trang chủ</a>
+        </div>
+      </form>
+    </div>
+  </section>
+</main><script>function togglePassword(id,btn){const el=document.getElementById(id);el.type=el.type==='password'?'text':'password';btn.textContent=el.type==='password'?'👁':'🙈';}</script></body></html>

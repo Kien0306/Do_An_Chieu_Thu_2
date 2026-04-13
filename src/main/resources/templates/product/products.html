@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KINGSPORT - Sản phẩm</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<div th:replace="~{fragments/layout :: siteHeader('products', ${keyword})}"></div>
+
+<main class="container page">
+  <div class="page-header simple-header">
+    <div>
+      <h1 id="catalogTitle">Sản phẩm</h1>
+    </div>
+    <div class="row">
+      <a id="openProductFormBtn"
+         class="btn primary"
+         th:if="${isAdmin}"
+         th:href="@{/products/new}">
+        Thêm sản phẩm
+      </a>
+    </div>
+  </div>
+
+  <section class="layout">
+    <aside class="sidebar">
+      <form method="get" th:action="@{/products}" id="productFilterForm">
+        <div class="filter-group filter-heading filter-heading-row">
+          <h3>Bộ lọc</h3>
+          <button type="button" class="btn secondary btn-sm" id="clearProductFiltersBtn">Xóa bộ lọc</button>
+        </div>
+
+        <div class="filter-group collapsible open">
+          <button class="filter-toggle" type="button">
+            <span>Danh mục</span>
+          </button>
+          <div class="filter-content" id="categoryFilters" style="display:block;">
+            <label class="filter-option">
+              <input type="radio" name="category" value="" th:checked="${selectedCategory == null}">
+              <span>Tất cả</span>
+            </label>
+
+            <label class="filter-option" th:each="c : ${categories}">
+              <input type="radio"
+                     name="category"
+                     th:value="${c.id}"
+                     th:checked="${selectedCategory != null and selectedCategory == c.id}">
+              <span th:text="${c.name}"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="filter-group collapsible open">
+          <button class="filter-toggle" type="button">
+            <span>Giới tính</span>
+          </button>
+          <div class="filter-content" id="genderFilters" style="display:block;">
+            <label class="filter-option">
+              <input type="radio"
+                     name="gender"
+                     value=""
+                     th:checked="${selectedGender == null or selectedGender.isBlank()}">
+              <span>Tất cả</span>
+            </label>
+
+            <label class="filter-option" th:each="g : ${genders}">
+              <input type="radio"
+                     name="gender"
+                     th:value="${g}"
+                     th:checked="${selectedGender == g}">
+              <span th:text="${g == 'nam' ? 'Nam' : (g == 'nu' ? 'Nữ' : 'Unisex')}"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="filter-group collapsible open">
+          <button class="filter-toggle" type="button">
+            <span>Kích thước</span>
+          </button>
+          <div class="filter-content" id="sizeFilters" style="display:block;">
+            <label class="choice-chip"
+                   th:each="s : ${sizes}"
+                   th:classappend="${#lists.contains(selectedSizes, s)} ? ' active' : ''">
+              <input type="checkbox"
+                     name="size"
+                     th:value="${s}"
+                     th:checked="${#lists.contains(selectedSizes, s)}">
+              <span th:text="${s}"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="filter-group collapsible open">
+          <button class="filter-toggle" type="button">
+            <span>Màu sắc</span>
+          </button>
+          <div class="filter-content" id="colorFilters" style="display:block;">
+            <div class="filter-color-grid">
+              <label class="filter-color-item"
+                     th:each="c : ${colors}"
+                     th:classappend="${#lists.contains(selectedColors, c)} ? ' active' : ''" th:attr="data-color-name=${c}">
+                <input type="checkbox"
+                       name="color"
+                       th:value="${c}"
+                       th:checked="${#lists.contains(selectedColors, c)}">
+                <span class="filter-color-dot" th:style="'--swatch:' + ${@productService.resolveColorHex(c)}"></span>
+                <span class="filter-color-label" th:text="${c}"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <input type="hidden" name="keyword" th:value="${keyword}">
+        <input type="hidden" name="sort" th:value="${sort}">
+        <input type="hidden" name="mode" th:value="${mode}">
+      </form>
+    </aside>
+
+    <div class="panel product-panel">
+      <div class="catalog-toolbar">
+        <label class="catalog-sort-label" for="sortSelect">Phân loại</label>
+        <select id="sortSelect" class="catalog-sort-select" onchange="applySort(this.value)">
+          <option value="" th:selected="${sort == null or sort.isBlank()}">Mặc định</option>
+          <option value="price_asc" th:selected="${sort == 'price_asc'}">Giá tăng dần</option>
+          <option value="price_desc" th:selected="${sort == 'price_desc'}">Giá giảm dần</option>
+          <option value="name_asc" th:selected="${sort == 'name_asc'}">Tên A-Z</option>
+        </select>
+      </div>
+
+      <div id="productGrid" class="grid">
+        <div class="product-card"
+             th:each="p : ${products}"
+             th:attr="data-name=${#strings.toLowerCase(p.name)},
+                      data-category=${p.category != null ? p.category.id : 0},
+                      data-gender=${p.gender != null ? p.gender : ''},
+                      data-sizes=${p.sizesCsv != null ? #strings.toLowerCase(p.sizesCsv) : ''},
+                      data-colors=${p.colorsCsv != null ? #strings.toLowerCase(p.colorsCsv) : ''},
+                      data-price=${p.price}">
+
+          <div class="product-media">
+            <a class="product-image-wrap product-link-wrap" th:href="@{'/products/' + ${p.id}}">
+              <img th:src="${p.imageUrl != null and !#strings.isEmpty(p.imageUrl) ? p.imageUrl : 'https://placehold.co/900x900/png'}"
+                   th:alt="${p.name}"
+                   onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='https://placehold.co/900x900/png';}">
+
+              <span class="featured-chip" th:if="${p.featured}">Nổi bật</span>
+              <span class="sold-out-chip" th:if="${p.stock != null and p.stock <= 0}">SOLD OUT</span>
+
+              <div class="quick-size-overlay" th:if="${p.sizes != null and #arrays.length(p.sizes) > 0}">
+                <div class="quick-size-title">Kích thước có sẵn</div>
+                <div class="quick-size-grid">
+                  <span class="quick-size-pill"
+                        th:each="s : ${p.sizes}"
+                        th:text="${s}"></span>
+                </div>
+              </div>
+            </a>
+
+            <div class="product-admin-actions" th:if="${isAdmin}">
+              <a class="product-admin-btn"
+                 th:href="@{'/products/edit/' + ${p.id}}"
+                 title="Sửa sản phẩm"
+                 aria-label="Sửa sản phẩm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z"></path>
+                </svg>
+              </a>
+
+              <form th:action="@{'/products/delete/' + ${p.id}}" method="post">
+                <button class="product-admin-btn danger"
+                        type="submit"
+                        title="Xóa sản phẩm"
+                        aria-label="Xóa sản phẩm">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18"></path>
+                    <path d="M8 6V4h8v2"></path>
+                    <path d="M19 6l-1 14H6L5 6"></path>
+                    <path d="M10 11v6"></path>
+                    <path d="M14 11v6"></path>
+                  </svg>
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <div class="body">
+            <div class="row between">
+              <span class="badge" th:text="${p.category != null ? p.category.name : 'Khác'}"></span>
+              <span class="meta"
+                    th:text="${p.gender == 'nam' ? 'Nam' : (p.gender == 'nu' ? 'Nữ' : 'Unisex')}"></span>
+            </div>
+
+            <h3>
+              <a class="product-title-link"
+                 th:href="@{'/products/' + ${p.id}}"
+                 th:text="${p.name}"></a>
+            </h3>
+
+            <div class="meta product-card-desc" th:text="${p.description}"></div>
+
+            <div class="price" th:text="${#numbers.formatInteger(p.price, 0, 'COMMA')} + 'đ'"></div>
+
+            <div class="product-color-row" th:if="${p.colors != null and #arrays.length(p.colors) > 0}">
+              <span class="product-color-dot"
+                    th:each="c,iter : ${p.colors}"
+                    th:if="${iter.index < 4}"
+                    th:style="'--swatch:' + ${colorHexMap[c] != null ? colorHexMap[c] : @productService.resolveColorHex(c)}"></span>
+            </div>
+
+            <div class="row between product-footer-row">
+              <span class="meta">&nbsp;</span>
+
+              <form th:action="@{'/cart/add/' + ${p.id}}" method="post">
+                <input type="hidden"
+                       name="selectedSize"
+                       th:value="${p.sizes != null and #arrays.length(p.sizes) > 0 ? p.sizes[0] : ''}">
+
+                <input type="hidden"
+                       name="selectedColor"
+                       th:value="${p.colors != null and #arrays.length(p.colors) > 0 ? p.colors[0] : ''}">
+
+                <button class="btn primary"
+                        type="submit"
+                        th:disabled="${p.stock != null and p.stock <= 0}"
+                        th:text="${p.stock != null and p.stock <= 0 ? 'Hết hàng' : 'Thêm giỏ hàng'}">
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div th:if="${#lists.isEmpty(products)}" class="panel empty-panel">
+        Không có sản phẩm phù hợp.
+      </div>
+
+      <div id="productPagination" class="catalog-pagination" th:if="${totalPages > 1}">
+        <a class="page-btn"
+           th:classappend="${currentPage <= 1} ? ' disabled' : ''"
+           th:href="@{/products(page=${currentPage - 1}, keyword=${keyword}, category=${selectedCategory}, gender=${selectedGender}, size=${selectedSizes}, color=${selectedColors}, sort=${sort}, mode=${mode})}">
+          ‹
+        </a>
+
+        <a class="page-btn"
+           th:each="i : ${#numbers.sequence(1, totalPages)}"
+           th:classappend="${i == currentPage} ? ' active' : ''"
+           th:text="${i}"
+           th:href="@{/products(page=${i}, keyword=${keyword}, category=${selectedCategory}, gender=${selectedGender}, size=${selectedSizes}, color=${selectedColors}, sort=${sort}, mode=${mode})}">
+        </a>
+
+        <a class="page-btn"
+           th:classappend="${currentPage >= totalPages} ? ' disabled' : ''"
+           th:href="@{/products(page=${currentPage + 1}, keyword=${keyword}, category=${selectedCategory}, gender=${selectedGender}, size=${selectedSizes}, color=${selectedColors}, sort=${sort}, mode=${mode})}">
+          ›
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-space"></div>
+</main>
+
+<script>
+  const filterForm = document.getElementById('productFilterForm');
+  const cards = Array.from(document.querySelectorAll('#productGrid .product-card'));
+  const searchInput = document.getElementById('searchInput');
+  const pagination = document.getElementById('productPagination');
+
+  function vnNormalize(value) {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .trim();
+  }
+
+  function activeValues(selector) {
+    return Array.from(filterForm.querySelectorAll(selector + ':checked'))
+      .map(el => vnNormalize(el.value))
+      .filter(Boolean);
+  }
+
+
+  const clearBtn = document.getElementById('clearProductFiltersBtn');
+
+  function clearAllFilters() {
+    if (!filterForm) return;
+    filterForm.querySelectorAll('input[type="radio"]').forEach((el, idx) => {
+      const shouldCheck = !el.value;
+      el.checked = shouldCheck;
+      el.closest('.filter-option')?.classList.toggle('active', shouldCheck);
+    });
+    filterForm.querySelectorAll('input[type="checkbox"]').forEach(el => {
+      el.checked = false;
+      el.closest('.choice-chip')?.classList.remove('active');
+      el.closest('.filter-color-item')?.classList.remove('active');
+    });
+    const sortInput = filterForm.querySelector('input[name="sort"]');
+    if (sortInput) sortInput.value = '';
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) sortSelect.value = '';
+    if (searchInput) searchInput.value = '';
+    const keywordHidden = filterForm.querySelector('input[name="keyword"]');
+    if (keywordHidden) keywordHidden.value = '';
+    applyClientFilters();
+  }
+
+  clearBtn?.addEventListener('click', clearAllFilters);
+
+  function applyClientFilters() {
+    const keyword = vnNormalize(
+      searchInput?.value ||
+      filterForm.querySelector('input[name="keyword"]')?.value ||
+      ''
+    );
+
+    const category = filterForm.querySelector('input[name="category"]:checked')?.value || '';
+    const gender = vnNormalize(filterForm.querySelector('input[name="gender"]:checked')?.value || '');
+    const sizes = activeValues('input[name="size"]');
+    const colors = activeValues('input[name="color"]');
+    const sort = filterForm.querySelector('input[name="sort"]')?.value || '';
+
+    const visible = [];
+
+    cards.forEach(card => {
+      const name = vnNormalize(card.dataset.name);
+      const cardCategory = card.dataset.category || '';
+      const cardGender = vnNormalize(card.dataset.gender);
+      const cardSizes = vnNormalize(card.dataset.sizes);
+      const cardColors = vnNormalize(card.dataset.colors);
+
+      let ok =
+        (!keyword || name.includes(keyword)) &&
+        (!category || cardCategory === category) &&
+        (!gender || cardGender === gender) &&
+        (!sizes.length || sizes.some(v => cardSizes.includes(v))) &&
+        (!colors.length || colors.some(v => cardColors.includes(v)));
+
+      card.style.display = ok ? '' : 'none';
+      if (ok) visible.push(card);
+    });
+
+    if (sort) {
+      const sorted = [...visible].sort((a, b) => {
+        const pa = Number(a.dataset.price || 0);
+        const pb = Number(b.dataset.price || 0);
+        const na = a.dataset.name || '';
+        const nb = b.dataset.name || '';
+
+        if (sort === 'price_asc') return pa - pb;
+        if (sort === 'price_desc') return pb - pa;
+        if (sort === 'name_asc') return na.localeCompare(nb, 'vi');
+        return 0;
+      });
+
+      const grid = document.getElementById('productGrid');
+      sorted.forEach(card => grid.appendChild(card));
+    }
+
+    if (pagination) {
+      pagination.style.display =
+        keyword || category || gender || sizes.length || colors.length
+          ? 'none'
+          : '';
+    }
+  }
+
+  filterForm?.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(el => {
+    el.addEventListener('change', () => {
+      el.closest('.choice-chip')?.classList.toggle('active', el.checked);
+      el.closest('.filter-color-item')?.classList.toggle('active', el.checked);
+      applyClientFilters();
+    });
+  });
+
+  function applySort(value) {
+    const form = document.getElementById('productFilterForm');
+    form.querySelector('input[name="sort"]').value = value;
+    applyClientFilters();
+  }
+
+  if (searchInput) {
+    searchInput.form?.addEventListener('submit', e => e.preventDefault());
+    searchInput.addEventListener('input', applyClientFilters);
+    searchInput.addEventListener('catalog-search', applyClientFilters);
+  }
+
+  applyClientFilters();
+</script>
+
+<script th:src="@{/js/common.js}"></script>
+</body>
+</html>

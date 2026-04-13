@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="${pageTitle}">Biểu mẫu sản phẩm</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<div th:replace="~{fragments/layout :: siteHeader('products', '')}"></div>
+<main class="page">
+  <div class="container">
+    <section class="panel category-form-panel product-form-panel-xl">
+      <div class="page-header">
+        <div>
+          <h1 th:text="${pageTitle}">Thêm sản phẩm</h1>
+          <p th:text="${product.id != null ? 'Cập nhật sản phẩm trong hệ thống.' : 'Tạo sản phẩm mới trong hệ thống.'}"></p>
+        </div>
+        <a class="btn secondary" th:href="@{/products}">Quay lại sản phẩm</a>
+      </div>
+      <form th:action="@{/products/save}" method="post" enctype="multipart/form-data" class="admin-product-form product-editor-modern" id="productEditorForm">
+        <input type="hidden" name="id" th:value="${product.id}">
+        <input type="hidden" name="sizesCsv" id="sizesCsvHidden" th:value="${product.sizesCsv}">
+        <input type="hidden" name="colorsCsv" id="colorsCsvHidden" th:value="${product.colorsCsv}">
+        <input type="hidden" name="sizePricesJson" id="sizePricesJsonHidden" th:value="${product.sizePricesJson}">
+        <input type="hidden" name="sizeStocksJson" id="sizeStocksJsonHidden" value="{}">
+
+        <div class="admin-form-grid admin-form-grid-2 product-form-modern-grid">
+          <div class="form-group"><label>Tên sản phẩm</label><input name="name" th:value="${product.name}" required></div>
+          <div class="form-group"><label>Giá mặc định</label><input name="price" type="number" min="0" th:value="${product.price}" required></div>
+          <div class="form-group"><label>Danh mục</label><select name="categoryId" required><option value="">Chọn danh mục</option><option th:each="c : ${categories}" th:value="${c.id}" th:selected="${product.category != null and product.category.id == c.id}" th:text="${c.name}"></option></select></div>
+          <div class="form-group"><label>Giới tính</label><div class="gender-pill-row"><label class="gender-pill"><input type="radio" name="gender" value="nam" th:checked="${product.gender == 'nam'}"><span>Nam</span></label><label class="gender-pill"><input type="radio" name="gender" value="nu" th:checked="${product.gender == 'nu'}"><span>Nữ</span></label><label class="gender-pill"><input type="radio" name="gender" value="unisex" th:checked="${product.gender == null or product.gender == 'unisex'}"><span>Unisex</span></label></div></div>
+          <input type="hidden" name="imageUrl" id="imageUrlInput" th:value="${product.imageUrl}">
+          <div class="form-group form-group-image" style="grid-column:1/-1;">
+            <label class="form-label-tight">Chọn ảnh từ máy</label>
+            <div class="custom-file-box">
+              <label for="localImageInput" class="custom-file-btn">Chọn file</label>
+              <span id="localImageFileName" class="custom-file-name">Chưa chọn tệp</span>
+              <input type="file" id="localImageInput" name="localImage" accept="image/*" hidden>
+            </div>
+            <div id="productImagePreviewWrap" class="product-form-preview" th:if="${product.imageUrl != null and !product.imageUrl.isBlank()}"><img id="productImagePreview" th:src="${product.imageUrl}" alt="preview"></div>
+            <div id="productImagePreviewWrapEmpty" class="product-form-preview hidden"><img id="productImagePreviewEmpty" src="" alt="preview"></div>
+          </div>
+          <div class="form-group" style="grid-column:1/-1;"><label>Kích thước</label><input type="text" id="sizeInputBox" data-required-list="sizes" placeholder="Nhập size rồi nhấn Enter, ví dụ: S, M, 40, One Size"><div class="tag-list" id="sizeTagList"></div></div>
+          <div class="form-group" style="grid-column:1/-1;"><label>Giá theo kích thước</label><div id="sizePriceRows" class="dynamic-sub-grid"><div class="muted-placeholder">Thêm kích thước trước để nhập giá riêng cho từng size.</div></div></div>
+          <div class="form-group" style="grid-column:1/-1;"><label>Tồn kho theo size</label><div id="sizeStockRows" class="dynamic-sub-grid"><div class="muted-placeholder">Thêm kích thước trước để nhập tồn kho cho từng size.</div></div></div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label>Màu sắc</label>
+            <div class="color-entry-row color-entry-row-node">
+              <input type="text" id="colorInputBox" placeholder="Nhập tên màu rồi nhấn Enter, ví dụ: Đỏ, Đen, Xanh lam" data-required-list="colors">
+              <label class="color-code-box" for="colorHexPicker"><span class="color-code-label">Mã màu</span><input type="color" id="colorHexPicker" value="#2563eb"></label>
+            </div>
+            <div class="tag-list tag-list-colors" id="colorTagList"></div>
+          </div>
+          <div class="form-group checkbox-row checkbox-row-start" style="grid-column:1/-1;"><label class="featured-toggle-row"><input type="checkbox" name="featured" value="true" th:checked="${product.featured}"><span>Đánh dấu là sản phẩm nổi bật ở trang chủ</span></label></div>
+          <div class="form-group" style="grid-column:1/-1;"><label>Mô tả</label><textarea name="description" style="min-height:220px;" th:text="${product.description}"></textarea></div>
+        </div>
+        <div class="form-actions"><button class="btn primary" type="submit">Lưu sản phẩm</button><a class="btn secondary" href="javascript:history.back()">Hủy</a></div>
+      </form>
+    </section>
+  </div>
+</main>
+<script th:inline="javascript">
+(() => {
+  const existingSizes = /*[[${product.sizesCsv}]]*/ '';
+  const existingColors = /*[[${product.colorsCsv}]]*/ '';
+  const existingSizePricesJson = /*[[${product.sizePricesJson}]]*/ '{}';
+  const existingSizeStocksJson = /*[[${existingSizeStocks}]]*/ {}; 
+  const hiddenSizes = document.getElementById('sizesCsvHidden');
+  const hiddenColors = document.getElementById('colorsCsvHidden');
+  const hiddenSizePrices = document.getElementById('sizePricesJsonHidden');
+  const hiddenSizeStocks = document.getElementById('sizeStocksJsonHidden');
+  const sizeInput = document.getElementById('sizeInputBox');
+  const colorInput = document.getElementById('colorInputBox');
+  const colorPicker = document.getElementById('colorHexPicker');
+  const sizeTagList = document.getElementById('sizeTagList');
+  const colorTagList = document.getElementById('colorTagList');
+  const colorMap = new Map();
+  const sizePriceRows = document.getElementById('sizePriceRows');
+  const sizeStockRows = document.getElementById('sizeStockRows');
+  const imageUrlInput = document.getElementById('imageUrlInput');
+  const localImageInput = document.getElementById('localImageInput');
+  const previewImg = document.getElementById('productImagePreview') || document.getElementById('productImagePreviewEmpty');
+  const previewWrap = document.getElementById('productImagePreviewWrap') || document.getElementById('productImagePreviewWrapEmpty');
+  const localImageFileName = document.getElementById('localImageFileName');
+  const sizes = existingSizes ? existingSizes.split(',').map(s => s.trim()).filter(Boolean) : [];
+  let colors = existingColors ? existingColors.split(',').map(s => s.trim()).filter(Boolean) : [];
+  colors = colors.map(c => c.includes('|') ? c : `${c}|#2563eb`);
+  colors.forEach(c => colorMap.set(c, c.includes('|') ? c.split('|')[1].trim() : '#2563eb'));
+  let sizePrices = {};
+  let sizeStocks = existingSizeStocksJson || {};
+  try { sizePrices = existingSizePricesJson ? JSON.parse(existingSizePricesJson) : {}; } catch (e) { sizePrices = {}; }
+  sizes.forEach(size => { if (typeof sizeStocks[size] === 'undefined') sizeStocks[size] = 0; });
+  function syncHidden() {
+    hiddenSizes.value = sizes.join(',');
+    hiddenColors.value = colors.map(color => {
+      const parts = String(color).split('|');
+      const name = (parts[0] || '').trim();
+      const hex = (parts[1] || colorMap.get(color) || '#2563eb').trim();
+      return name ? `${name}|${hex}` : '';
+    }).filter(Boolean).join(',');
+    hiddenSizePrices.value = JSON.stringify(sizePrices);
+    hiddenSizeStocks.value = JSON.stringify(sizeStocks);
+  }
+  function renderSizes() {
+    sizeTagList.innerHTML = sizes.map(size => `<button type="button" class="editor-tag" data-size="${size}">${size}<span>×</span></button>`).join('');
+    sizePriceRows.innerHTML = sizes.length ? sizes.map(size => `<label class="sub-field"><span>${size}</span><input type="number" min="0" data-price="${size}" value="${sizePrices[size] || ''}" placeholder="Giá cho size ${size}"></label>`).join('') : '<div class="muted-placeholder">Thêm kích thước trước để nhập giá riêng cho từng size.</div>';
+    sizeStockRows.innerHTML = sizes.length ? sizes.map(size => `<label class="sub-field"><span>${size}</span><input type="number" min="0" data-stock="${size}" value="${sizeStocks[size] || 0}" placeholder="Tồn kho size ${size}"></label>`).join('') : '<div class="muted-placeholder">Thêm kích thước trước để nhập tồn kho cho từng size.</div>';
+    sizeTagList.querySelectorAll('[data-size]').forEach(btn => btn.onclick = () => { const idx = sizes.indexOf(btn.dataset.size); if (idx >= 0) { delete sizePrices[sizes[idx]]; delete sizeStocks[sizes[idx]]; sizes.splice(idx,1); renderSizes(); syncHidden(); }});
+    sizePriceRows.querySelectorAll('[data-price]').forEach(input => input.oninput = () => { sizePrices[input.dataset.price] = Number(input.value || 0); syncHidden(); });
+    sizeStockRows.querySelectorAll('[data-stock]').forEach(input => input.oninput = () => { sizeStocks[input.dataset.stock] = Number(input.value || 0); syncHidden(); });
+    syncHidden();
+  }
+  function renderColors() {
+    colorTagList.innerHTML = colors.length ? colors.map(color => {
+      const parts = String(color).split('|');
+      const name = (parts[0] || '').trim();
+      const hex = (parts[1] || colorMap.get(color) || '#2563eb').trim();
+      return `<span class="editor-tag color-tag"><span class="color-dot" style="--swatch:${hex}"></span><span class="color-name">${name}</span><button type="button" data-color="${color}">×</button></span>`;
+    }).join('') : '<div class="muted-placeholder">Chưa có màu sắc nào.</div>';
+    colorTagList.querySelectorAll('[data-color]').forEach(btn => btn.onclick = () => { colors = colors.filter(c => c !== btn.dataset.color); colorMap.delete(btn.dataset.color); renderColors(); syncHidden(); });
+    syncHidden();
+  }
+  sizeInput?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const value = sizeInput.value.trim();
+      if (value && !sizes.includes(value)) { sizes.push(value); sizePrices[value] = sizePrices[value] || 0; sizeStocks[value] = sizeStocks[value] || 0; }
+      sizeInput.value=''; renderSizes();
+    }
+  });
+  colorInput?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const value = colorInput.value.trim();
+      const hex = colorPicker?.value || '#2563eb';
+      const entry = value ? `${value}|${hex}` : '';
+      if (entry && !colors.some(c => String(c).split('|')[0].trim().toLowerCase() === value.toLowerCase())) {
+        colors.push(entry);
+        colorMap.set(entry, hex);
+      }
+      colorInput.value=''; renderColors();
+    }
+  });
+  localImageInput?.addEventListener('change', () => {
+    const file = localImageInput.files?.[0];
+    if (!file) return;
+    if (localImageFileName) localImageFileName.textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const previewSrc = e.target?.result || "";
+      if (previewImg) {
+        previewImg.src = previewSrc;
+        previewWrap?.classList.remove('hidden');
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+  if (imageUrlInput?.value && previewImg) { previewImg.src = imageUrlInput.value; previewWrap?.classList.remove('hidden'); }
+  imageUrlInput?.addEventListener('input', () => { if (previewImg) { previewImg.src = imageUrlInput.value; previewWrap?.classList.toggle('hidden', !imageUrlInput.value); } });
+  renderSizes(); renderColors();
+  const form = document.getElementById('productEditorForm');
+  form?.addEventListener('submit', (e) => {
+    const name = form.querySelector('input[name="name"]');
+    const price = form.querySelector('input[name="price"]');
+    const category = form.querySelector('select[name="categoryId"]');
+    if (!name?.value.trim()) { e.preventDefault(); alert('Không được để trống tên sản phẩm.'); name?.focus(); return; }
+    if (!price?.value || Number(price.value) < 0) { e.preventDefault(); alert('Không được để trống giá mặc định.'); price?.focus(); return; }
+    if (!category?.value) { e.preventDefault(); alert('Không được để trống danh mục.'); category?.focus(); return; }
+    if (!sizes.length) { e.preventDefault(); alert('Không được để trống kích thước.'); sizeInput?.focus(); return; }
+    const desc = form.querySelector('textarea[name="description"]');
+    if (!colors.length) { e.preventDefault(); alert('Không được để trống màu sắc.'); colorInput?.focus(); return; }
+    if (!desc?.value.trim()) { e.preventDefault(); alert('Không được để trống mô tả.'); desc?.focus(); return; }
+  });
+
+})();
+</script>
+<script th:src="@{/js/common.js}"></script>
+</body>
+</html>

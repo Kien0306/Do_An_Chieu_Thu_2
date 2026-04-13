@@ -1,0 +1,17 @@
+<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Mã giảm giá</title><link rel="stylesheet" th:href="@{/css/style.css}"></head><body>
+<div th:replace="~{fragments/layout :: adminHeader('dashboard')}"></div>
+<main class="page"><div class="container"><section class="panel coupon-page-panel">
+  <div class="page-header"><div><h1>Mã giảm giá</h1><p>Quản lý mã giảm giá thanh toán riêng, tách biệt với mã đổi điểm.</p></div><div class="row"><a class="btn secondary" th:href="@{/admin}">Quay lại</a><a class="btn primary" th:href="@{/admin/coupons/payment/new}">Thêm mã giảm giá</a></div></div>
+  <div class="table-wrap"><table><thead><tr><th>MÃ</th><th>TÊN HIỂN THỊ</th><th>LOẠI</th><th>GIÁ TRỊ</th><th>ĐƠN TỐI THIỂU</th><th>GIẢM TỐI ĐA</th><th>TRẠNG THÁI</th><th>THAO TÁC</th></tr></thead><tbody>
+    <tr th:each="c : ${coupons}">
+      <td><strong th:text="${c.code}"></strong></td>
+      <td th:text="${c.title}"></td>
+      <td th:text="${c.couponType == 'percent' ? 'Giảm theo %' : 'Giảm tiền cố định'}"></td>
+      <td th:text="${c.couponType == 'percent' ? c.couponValue + '%' : #numbers.formatInteger(c.couponValue,0,'COMMA') + 'đ'}"></td>
+      <td th:text="${#numbers.formatInteger(c.minOrderAmount,0,'COMMA')} + 'đ'"></td>
+      <td th:text="${c.maxDiscount > 0 ? #numbers.formatInteger(c.maxDiscount,0,'COMMA') + 'đ' : '-'}"></td>
+      <td th:text="${c.active ? 'Đang bật' : 'Đang bật'}"></td>
+      <td><div class="row"><a class="btn secondary btn-sm" th:href="@{'/admin/coupons/payment/' + ${c.id} + '/edit'}">Sửa</a><form th:action="@{'/admin/coupons/payment/' + ${c.id} + '/delete'}" method="post"><button class="btn danger btn-sm" type="submit">Xóa</button></form></div></td>
+    </tr>
+  </tbody></table></div>
+</section></div></main></body></html>

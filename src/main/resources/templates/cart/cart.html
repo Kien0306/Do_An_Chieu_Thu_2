@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KINGSPORT - Giỏ hàng</title>
+  <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<div th:replace="~{fragments/layout :: siteHeader('cart','')}"></div>
+<main class="container page">
+  <div class="page-header">
+    <div><h1>Giỏ hàng</h1></div>
+    <a class="btn secondary" th:href="@{/products}">Tiếp tục mua sắm</a>
+  </div>
+  <section class="cart-layout">
+    <div class="panel">
+      <div id="cartList">
+        <div th:if="${items == null or items.isEmpty()}" class="panel empty-panel">Giỏ hàng đang trống.</div>
+        <div class="cart-item" th:each="item : ${items}">
+          <img th:src="${item.product != null and item.product.imageUrl != null and !#strings.isEmpty(item.product.imageUrl) ? item.product.imageUrl : 'https://placehold.co/300x300/png'}" th:alt="${item.product != null ? item.product.name : 'Sản phẩm'}" onerror="this.src='https://placehold.co/300x300/png'">
+          <div>
+            <strong th:text="${item.product.name}"></strong>
+            <div class="meta" th:text="${item.product.category != null ? item.product.category.name : ''}"></div>
+            <div class="meta" th:text="${item.product.gender == 'nam' ? 'Nam' : (item.product.gender == 'nu' ? 'Nữ' : 'Unisex')}"></div>
+            <div th:text="${#numbers.formatInteger(item.product.price,0,'COMMA')} + 'đ x ' + ${item.quantity}"></div>
+            <form th:action="@{/cart/update-options}" method="post" class="cart-option-form" style="margin-top:10px; display:grid; gap:8px; max-width:480px;">
+              <input type="hidden" name="lineKey" th:value="${item.lineKey}">
+              <label class="meta" style="margin:0;">Size:</label>
+              <select name="selectedSize" class="cart-size-select">
+                <option th:each="s : ${item.product.sizes}" th:value="${s}" th:text="${s}" th:selected="${s == item.selectedSize}"></option>
+              </select>
+              <div class="meta" th:if="${item.selectedColor != null and !item.selectedColor.isBlank()}" th:text="${'Màu: ' + item.selectedColor}"></div>
+            </form>
+          </div>
+          <div>
+            <div style="font-weight:700; margin-bottom:10px" th:text="${#numbers.formatInteger(item.subtotal,0,'COMMA')} + 'đ'"></div>
+            <div class="cart-qty-form" th:attr="data-line-key=${item.lineKey}" style="display:flex; gap:8px; align-items:center;">
+              <button class="btn secondary btn-sm js-cart-qty" type="button" th:attr="data-quantity=${item.quantity - 1}">−</button>
+              <strong th:text="${item.quantity}" style="min-width:24px;text-align:center;"></strong>
+              <button class="btn secondary btn-sm js-cart-qty" type="button" th:attr="data-quantity=${item.quantity + 1}">+</button>
+              <button class="btn danger btn-sm icon-only trash-btn js-cart-remove" type="button" aria-label="Xóa"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel summary-card">
+      <h3 style="margin-top:0">Tóm tắt đơn hàng</h3>
+      <div class="row between" style="margin-bottom:10px;"><span>Tổng tiền</span><strong th:text="${#numbers.formatInteger(total,0,'COMMA')} + 'đ'"></strong></div>
+      <div class="row between" style="margin-bottom:18px;"><span>Thanh toán tạm tính</span><strong th:text="${#numbers.formatInteger(total,0,'COMMA')} + 'đ'"></strong></div>
+      <a class="btn primary" style="width:100%; text-align:center; display:inline-block;" th:href="@{/checkout}">Thanh toán</a>
+    </div>
+  </section>
+</main>
+
+<script th:src="@{/js/common.js}"></script>
+<script>
+(() => {
+  const root = document.querySelector('main.container.page');
+  if (!root) return;
+
+  async function refreshCart() {
+    const html = await fetch('/cart', { headers: { 'X-Requested-With': 'fetch' }, cache: 'no-store' }).then(r => r.text());
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const nextMain = doc.querySelector('main.container.page');
+    if (nextMain) root.innerHTML = nextMain.innerHTML;
+    const nextCount = doc.getElementById('cartCount');
+    const curCount = document.getElementById('cartCount');
+    if (nextCount && curCount) curCount.textContent = nextCount.textContent;
+    bindCart();
+  }
+
+  async function postForm(url, data) {
+    await fetch(url, {
+      method: 'POST',
+      body: new URLSearchParams(data),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'X-Requested-With': 'fetch'
+      }
+    });
+  }
+
+  function setBusy(el, busy) {
+    if (!el) return;
+    el.disabled = busy;
+    el.style.pointerEvents = busy ? 'none' : '';
+    el.style.opacity = busy ? '0.7' : '';
+  }
+
+  function bindCart() {
+    root.querySelectorAll('.js-cart-qty').forEach(btn => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', async () => {
+        const wrap = btn.closest('.cart-qty-form');
+        const lineKey = wrap?.dataset.lineKey;
+        const quantity = btn.dataset.quantity;
+        if (!lineKey || quantity == null) return;
+        root.querySelectorAll('.js-cart-qty, .js-cart-remove, .cart-size-select').forEach(el => setBusy(el, true));
+        try {
+          await postForm('/cart/update', { lineKey, quantity });
+          await refreshCart();
+        } finally {
+          root.querySelectorAll('.js-cart-qty, .js-cart-remove, .cart-size-select').forEach(el => setBusy(el, false));
+        }
+      });
+    });
+
+    root.querySelectorAll('.js-cart-remove').forEach(btn => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', async () => {
+        const wrap = btn.closest('.cart-qty-form');
+        const lineKey = wrap?.dataset.lineKey;
+        if (!lineKey) return;
+        root.querySelectorAll('.js-cart-qty, .js-cart-remove, .cart-size-select').forEach(el => setBusy(el, true));
+        try {
+          await postForm('/cart/remove', { lineKey });
+          await refreshCart();
+        } finally {
+          root.querySelectorAll('.js-cart-qty, .js-cart-remove, .cart-size-select').forEach(el => setBusy(el, false));
+        }
+      });
+    });
+
+    root.querySelectorAll('.cart-option-form').forEach(form => {
+      if (form.dataset.bound) return;
+      form.dataset.bound = '1';
+      const select = form.querySelector('select[name="selectedSize"]');
+      if (select) {
+        select.addEventListener('change', async () => {
+          root.querySelectorAll('.js-cart-qty, .js-cart-remove, .cart-size-select').forEach(el => setBusy(el, true));
+          try {
+            await postForm('/cart/update-options', {
+              lineKey: form.querySelector('input[name="lineKey"]')?.value || '',
+              selectedSize: select.value || ''
+            });
+            await refreshCart();
+          } finally {
+            root.querySelectorAll('.js-cart-qty, .js-cart-remove, .cart-size-select').forEach(el => setBusy(el, false));
+          }
+        });
+      }
+    });
+  }
+
+  bindCart();
+  enableLiveRefresh({ selector: 'main.container.page', onlyPaths: ['/cart'], interval: 4000 });
+})();
+</script>
+</body>
+</html>
